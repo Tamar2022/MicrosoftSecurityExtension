@@ -1,0 +1,31 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: postgres
+spec:
+  selector:
+    matchLabels:
+      app: postgres
+  template:
+    metadata:
+      labels:
+        app: postgres
+    spec:
+      containers:
+        - name: postgres
+          image: postgres
+          ports:
+            - containerPort: 5432
+          env:
+            - name: POSTGRES_DB
+              value: mydatabase           # an explicit env var value
+            - name: POSTGRES_USER
+              valueFrom:
+                configMapKeyRef:          # populate from a ConfigMap
+                  name: postgres-config   # ... with this name
+                  key: my.username        # ... and look for this key
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:             # populate from a Secret
+                  name: postgres-secret   # ... with this name
+                  key: secret.password    # ... and look for this key

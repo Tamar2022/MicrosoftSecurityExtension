@@ -1,0 +1,10 @@
+{
+    "version": "2.0",
+    "GITLAB_KEY": "YXNkZmZmZmZm_HARDcoded",
+    "noncompliant" :{
+      "apikey": "YXNkZmZmZmZm_HARDcoded"
+    },
+    "dependencies": {
+      "parse-passwd": "^1.0.0"
+    }
+}
