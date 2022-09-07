@@ -1,0 +1,10 @@
+[
+    {
+        "path": "./gates/whispers/whispers-gate",
+        "name": "WhispersGate"
+    },
+    {
+        "path": "./gates/retireGate",
+        "name": "RetireGate"
+    }
+]

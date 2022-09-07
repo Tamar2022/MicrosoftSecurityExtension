@@ -1,0 +1,207 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2015-01-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "aadApplicationName": {
+      "type": "string"
+    },
+    "aadUniqueName": {
+      "type": "string"
+    },
+    "certificateSubjectName": {
+      "type": "string"
+    },
+    "appIdUri": {
+      "type": "string"
+    },
+    "signInAudience": {
+      "type": "string"
+    },
+    "aadAppOwnerIds": {
+      "type": "string",
+      "defaultValue": ""
+    },
+    "generatedSecretFromKeyVault": {
+      "type": "securestring",
+      "defaultValue": ""
+    },
+    "applicationKeyExpiryStartTime": {
+      "type": "string",
+      "defaultValue": "[utcNow('u')]"
+    },
+    "applicationKeyKeyVaultSecretName": {
+      "type": "string",
+      "defaultValue": ""
+    },
+    "keyVaultName": {
+      "type": "string",
+      "defaultValue": ""
+    },
+    "forceCreateServicePrincipals": {
+      "type": "string"
+    }
+  },
+  "variables": {
+    "aadAppOwnerIds": "[if(empty(parameters('aadAppOwnerIds')), array('EMPTY_ARRAY'), json(parameters('aadAppOwnerIds')))]",
+    "trustedAuthorityId": "00000000-0000-0000-0000-000000000001",
+    "base64EncodedSecret": "[base64(parameters('generatedSecretFromKeyVault'))]",
+    "clientSecretName": "[if(empty(parameters('applicationKeyKeyVaultSecretName')), 'applicationKeyKeyVaultSecretName', parameters('applicationKeyKeyVaultSecretName'))]",
+    "keyVaultName": "[if(empty(parameters('keyVaultName')), 'keyVaultName', parameters('keyVaultName'))]",
+    "keyCredentials": [
+      {
+        "usage": "Verify",
+        "key": "[base64(parameters('generatedSecretFromKeyVault'))]",
+        "type": "Symmetric",
+        "displayName": "Client Secret",
+        "startDateTime": "[parameters('applicationKeyExpiryStartTime')]",
+        "endDateTime": "[dateTimeAdd(parameters('applicationKeyExpiryStartTime'), 'P100Y')]"
+      }
+    ]
+  },
+  "resources": [
+    {
+      "condition": "[and(not(equals(parameters('applicationKeyKeyVaultSecretName'), '')), not(empty(parameters('keyVaultName'))))]",
+      "type": "Microsoft.KeyVault/vaults/secrets",
+      "apiVersion": "2015-06-01",
+      "name": "[concat(variables('keyVaultName'), '/', variables('clientSecretName'))]",
+      "properties": {
+        "value": "[variables('base64EncodedSecret')]"
+      }
+    },
+    {
+      "type": "Microsoft.Identity/applications",
+      "apiVersion": "2020-03-31-preview",
+      "name": "[parameters('aadApplicationName')]",
+      "properties": {
+        "displayName": "[parameters('aadApplicationName')]",
+        "uniqueName": "[parameters('aadUniqueName')]",
+        "identifierUris": [
+          "[parameters('appIdUri')]"
+        ],
+        "keyCredentials": "[if(empty(parameters('generatedSecretFromKeyVault')), json('[]'), variables('keyCredentials'))]",
+        "signInAudience": "[parameters('signInAudience')]"
+      },
+      "resources": [
+        {
+          "type": "trustedCertificateSubjects",
+          "apiVersion": "2020-03-31-preview",
+          "condition": "[not(empty(parameters('certificateSubjectName')))]",
+          "name": "default",
+          "dependsOn": [
+            "[parameters('aadApplicationName')]"
+          ],
+          "properties": {
+            "values": [
+              {
+                "authorityId": "[variables('trustedAuthorityId')]",
+                "subjectName": "[parameters('certificateSubjectName')]"
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "type": "Microsoft.Resources/deployments",
+      "apiVersion": "2019-10-01",
+      "name": "[concat(parameters('aadUniqueName'), copyIndex())]",
+      "dependsOn": [
+        "[parameters('aadApplicationName')]"
+      ],
+      "copy": {
+        "name": "aadOwnersCopy",
+        "count": "[length(variables('aadAppOwnerIds'))]"
+      },
+      "properties": {
+        "mode": "Incremental",
+        "expressionEvaluationOptions": {
+          "scope": "inner"
+        },
+        "parameters": {
+          "aadAppId": {
+            "value": "[reference(parameters('aadApplicationName')).appId]"
+          },
+          "appIdUri": {
+            "value": "[parameters('appIdUri')]"
+          },
+          "aadAppOwnerId": {
+            "value": "[if(not(equals(variables('aadAppOwnerIds')[copyIndex()], 'EMPTY_ARRAY')), variables('aadAppOwnerIds')[copyIndex()], 'EMPTY')]"
+          },
+          "aadApplicationName": {
+            "value": "[parameters('aadApplicationName')]"
+          },
+          "forceCreateServicePrincipals": {
+              "value": "[parameters('forceCreateServicePrincipals')]"
+          }
+        },
+        "template": {
+          "$schema": "http://schema.management.azure.com/schemas/2015-01-01/deploymentTemplate.json#",
+          "contentVersion": "1.0.0.0",
+          "parameters": {
+            "aadApplicationName": {
+              "type": "string"
+            },
+            "aadAppId": {
+              "type": "string"
+            },
+            "appIdUri": {
+              "type": "string"
+            },
+            "aadAppOwnerId": {
+              "type": "string"
+            },
+            "forceCreateServicePrincipals": {
+              "type": "string"
+            }
+          },
+          "resources": [
+            {
+              "condition": "[not(equals(parameters('aadAppOwnerId'), 'EMPTY'))]",
+              "type": "Microsoft.Identity/applications/owners",
+              "apiVersion": "2020-03-31-preview",
+              "name": "[concat(parameters('aadApplicationName'), '/', parameters('aadAppOwnerId'))]",
+              "dependsOn": [
+                "[parameters('aadAppId')]"
+              ],
+              "properties": {
+                "id": "[parameters('aadAppOwnerId')]"
+              }
+            },
+            {
+              "type": "Microsoft.Identity/servicePrincipals",
+              "apiVersion": "2020-03-31-preview",
+              "name": "[parameters('aadAppId')]", 
+              "condition": "[bool(parameters('forceCreateServicePrincipals'))]",
+              "properties": {
+                "appId": "[parameters('aadAppId')]",
+                "accountEnabled": "true",
+                "alternativeNames": [],
+                "appRoleAssignmentRequired": false,
+                "keyCredentials": [],
+                "replyUrls": [],
+                "servicePrincipalNames": [
+                  "[parameters('appIdUri')]",
+                  "[parameters('aadAppId')]"
+                ]
+              },
+              "resources": [
+                {
+                  "condition": "[not(equals(parameters('aadAppOwnerId'), 'EMPTY'))]",
+                  "type": "owners",
+                  "name": "[parameters('aadAppOwnerId')]",
+                  "apiVersion": "2020-03-31-preview",
+                  "dependsOn": [
+                    "[parameters('aadAppId')]"
+                  ],
+                  "properties": {
+                    "id": "[parameters('aadAppOwnerId')]"
+                  }
+                }
+              ]
+            }
+          ]
+        }
+      }
+    }
+  ]
+}

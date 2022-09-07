@@ -1,0 +1,476 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "CapacitySBThroughputUnits": {
+      "type": "int"
+    },
+    "AnalyticsMIResourceID": {
+      "type": "string"
+    },
+    "ServiceBusNamespaceName": {
+      "type": "string"
+    },
+    "SoftwareInventoryScanningSbQueueName": {
+      "type": "string"
+    },
+    "VulnerabilityAssessmentScanningSbQueueName": {
+      "type": "string"
+    },
+    "PublishImageReportSbQueueName": {
+      "type": "string"
+    },
+    "RedisCacheName": {
+      "type": "string"
+    },
+    "VulnerabilitiesDbStorageAccountName": {
+      "type": "string"
+    },
+    "TrivyDbContainerName": {
+      "type": "string"
+    },
+    "DataStorageAccountName": {
+      "type": "string"
+    },
+    "VulnerabilityAssessmentStorageContainer": {
+      "type": "string"
+    },
+    "SoftwareInventoryStorageContainer": {
+      "type": "string"
+    },
+    "UntrustedFunctionsStorageAccountName": {
+      "type": "string"
+    },
+    "UntrustedFunctionAppsHostingPlanName": {
+      "type": "string"
+    },
+    "UntrustedFunctionAppsApplicationInsights": {
+      "type": "string"
+    },
+    "TrustedFunctionsStorageAccountName": {
+      "type": "string"
+    },
+    "TrustedFunctionAppsHostingPlanName": {
+      "type": "string"
+    },
+    "TrustedFunctionAppsApplicationInsights": {
+      "type": "string"
+    },
+    "GenevaNamespace": {
+      "type": "string",
+      "metadata": {
+        "description": "Geneva namespace"
+      }
+    },
+    "GenevaRoleIdentity": {
+      "type": "string",
+      "metadata": {
+        "description": "Geneva role identity"
+      }
+    },
+    "GenevaTenantIdentity": {
+      "type": "string",
+      "metadata": {
+        "description": "Geneva tenant identity"
+      }
+    },
+    "RegionShortName": {
+      "type": "string",
+      "metadata": {
+        "description": "the short abbreviation of the region short name (Ex: cus)"
+      }
+    },
+    "GenevaConfigJsonXstoreAccounts": {
+      "type": "string",
+      "metadata": {
+        "description": "Placeholder for GCS xstore accounts"
+      }
+    },
+    "GenevaConfigJsonGcsEnvironment": {
+      "type": "string",
+      "metadata": {
+        "description": "The name of the GCS environment"
+      }
+    },
+    "GenevaConfigJsonGcsAccount": {
+      "type": "string",
+      "metadata": {
+        "description": "The name of the GCS account"
+      }
+    },
+    "GenevaConfigJsonCertSubjectName": {
+      "type": "string",
+      "metadata": {
+        "description": "The subject name of the Geneva MDS certificate (keyvault managed)"
+      }
+    },
+    "GenevaConfigJsonVersion": {
+      "type": "string",
+      "metadata": {
+        "description": "The version of the Geneva configuration"
+      }
+    },
+    "GenevaCertKeyVaultResourceId": {
+      "type": "string"
+    },
+    "GenevaCertName": {
+      "type": "string"
+    }
+  },
+  "variables": {
+    "Location": "[resourceGroup().location]",
+    "ResourceGroupName": "[resourceGroup().name]",
+    "ResourceGroupID": "[resourceGroup().id]",
+    "AnalyticsMIResourceID": "[parameters('AnalyticsMIResourceID')]",
+    "AzureServiceBusDataOwnerRoleGuid": "090c5cfd-751d-490a-894a-3ce6f1109419",
+    "AzureServiceBusDataOwnerRoleDefinitionId": "[subscriptionResourceId('Microsoft.Authorization/roleDefinitions', variables('AzureServiceBusDataOwnerRoleGuid'))]",
+    "ResourceGroupServiceBusAnylticsRoleName": "[guid( parameters('AnalyticsMIResourceID'), subscription().id ,variables('AzureServiceBusDataOwnerRoleGuid'),variables('ResourceGroupName'))]",
+
+    "StorageBlobDataContributorGuid": "ba92f5b4-2d11-453d-a403-e96b0029c9fe", 
+    "StorageBlobDataContributorRoleName": "[guid( parameters('AnalyticsMIResourceID'), subscription().id ,variables('StorageBlobDataContributorGuid'),variables('ResourceGroupName'), parameters('DataStorageAccountName'))]",
+    "StorageBlobDataContributorRoleDefinitionId": "[subscriptionResourceId('Microsoft.Authorization/roleDefinitions', variables('StorageBlobDataContributorGuid'))]",
+
+    "SoftwareInventoryScanningSbQueueName": "[parameters('SoftwareInventoryScanningSbQueueName')]",
+    "VulnerabilityAssessmentScanningSbQueueName": "[parameters('VulnerabilityAssessmentScanningSbQueueName')]",
+    "PublishImageReportSbQueueName": "[parameters('PublishImageReportSbQueueName')]",
+    "GenevaRoleIdentityWithRegion": "[concat(parameters('RegionShortName'), '-', parameters('GenevaRoleIdentity'))]",
+    "GenevaconfigJson": {
+      "MONITORING_TENANT": "[parameters('GenevaTenantIdentity')]",
+      "MONITORING_ROLE": "[variables('GenevaRoleIdentityWithRegion')]",
+      "MONITORING_XSTORE_ACCOUNTS": "[parameters('GenevaConfigJsonXstoreAccounts')]",
+      "AdditionalEnvironmentVariables": [
+        {
+          "Key": "DATACENTER",
+          "Value": "[resourceGroup().location]"
+        },
+        {
+          "Key": "MONITORING_GCS_ENVIRONMENT",
+          "Value": "[parameters('GenevaConfigJsonGcsEnvironment')]"
+        },
+        {
+          "Key": "MONITORING_GCS_ACCOUNT",
+          "Value": "[parameters('GenevaConfigJsonGcsAccount')]"
+        },
+        {
+          "Key": "MONITORING_GCS_NAMESPACE",
+          "Value": "[parameters('GenevaNamespace')]"
+        },
+        {
+          "Key": "MONITORING_GCS_REGION",
+          "Value": "[resourceGroup().location]"
+        },
+        {
+          "Key": "MONITORING_GCS_AUTH_ID",
+          "Value": "[parameters('GenevaConfigJsonCertSubjectName')]"
+        },
+        {
+          "Key": "MONITORING_GCS_AUTH_ID_TYPE",
+          "Value": "AuthKeyVault"
+        },
+        {
+          "Key": "MONITORING_CONFIG_VERSION",
+          "Value": "[parameters('GenevaConfigJsonVersion')]"
+        },
+        {
+          "Key": "MONITORING_USE_GENEVA_CONFIG_SERVICE",
+          "Value": "true"
+        }
+      ]
+    },
+    "GenevaconfigXml": "<MonitoringManagement eventVersion=\"1\" version=\"1.0\" timestamp=\"2017-12-29T00:00:00Z\" namespace=\"PlaceHolder\"></MonitoringManagement>"
+  },
+  "resources": [
+    {
+      "type": "Microsoft.ServiceBus/namespaces",
+      "apiVersion": "2017-04-01",
+      "name": "[parameters('ServiceBusNamespaceName')]",
+      "location": "[variables('Location')]",
+      "sku": {
+        "name": "Premium",
+        "tier": "Premium",
+        "capacity": "[parameters('CapacitySBThroughputUnits')]"
+      },
+      "properties": {
+        "zoneRedundant": true
+      }
+    },
+    {
+      "type": "Microsoft.ServiceBus/namespaces/queues",
+      "apiVersion": "2017-04-01",
+      "name": "[concat(parameters('ServiceBusNamespaceName'), '/', variables('SoftwareInventoryScanningSbQueueName'))]",
+      "location": "[variables('Location')]",
+      "dependsOn": [
+        "[resourceId('Microsoft.ServiceBus/namespaces', parameters('ServiceBusNamespaceName'))]"
+      ],
+      "properties": {
+        "maxMessageSizeInKilobytes": 10240,
+        "lockDuration": "PT5M",
+        "maxDeliveryCount": 10,
+        "defaultMessageTimeToLive": "P30D",
+        "deadLetteringOnMessageExpiration": true
+      }
+    },
+    {
+      "type": "Microsoft.ServiceBus/namespaces/queues",
+      "apiVersion": "2017-04-01",
+      "name": "[concat(parameters('ServiceBusNamespaceName'), '/', variables('VulnerabilityAssessmentScanningSbQueueName'))]",
+      "location": "[variables('Location')]",
+      "dependsOn": [
+        "[resourceId('Microsoft.ServiceBus/namespaces', parameters('ServiceBusNamespaceName'))]"
+      ],
+      "properties": {
+        "maxMessageSizeInKilobytes": 10240,
+        "lockDuration": "PT5M",
+        "maxDeliveryCount": 10,
+        "defaultMessageTimeToLive": "P30D",
+        "deadLetteringOnMessageExpiration": true
+      }
+    },
+    {
+      "type": "Microsoft.ServiceBus/namespaces/queues",
+      "apiVersion": "2017-04-01",
+      "name": "[concat(parameters('ServiceBusNamespaceName'), '/', variables('PublishImageReportSbQueueName'))]",
+      "location": "[variables('Location')]",
+      "dependsOn": [
+        "[resourceId('Microsoft.ServiceBus/namespaces', parameters('ServiceBusNamespaceName'))]"
+      ],
+      "properties": {
+        "maxMessageSizeInKilobytes": 10240,
+        "lockDuration": "PT5M",
+        "maxDeliveryCount": 10,
+        "defaultMessageTimeToLive": "P30D",
+        "deadLetteringOnMessageExpiration": true
+      }
+    },
+    {
+      "type": "Microsoft.Authorization/roleAssignments",
+      "apiVersion": "2021-04-01-preview",
+      "name": "[variables('ResourceGroupServiceBusAnylticsRoleName')]",
+      "properties": {
+        "roleDefinitionId": "[variables('AzureServiceBusDataOwnerRoleDefinitionId')]",
+        "principalId": "[reference(variables('AnalyticsMIResourceID'), '2018-11-30', 'Full').properties.principalId]",
+        "scope": "[variables('ResourceGroupID')]"
+      }
+    },
+    {
+      "type": "Microsoft.Cache/Redis",
+      "apiVersion": "2021-06-01",
+      "name": "[parameters('RedisCacheName')]",
+      "location": "[variables('Location')]",
+      "properties": {
+        "sku": {
+          "name": "Standard",
+          "family": "C",
+          "capacity": 5
+        },
+        "enableNonSslPort": false,
+        "minimumTlsVersion": "1.2"
+      }
+    },
+    {
+      "apiVersion": "2019-06-01",
+      "type": "Microsoft.Storage/storageAccounts",
+      "name": "[parameters('DataStorageAccountName')]",
+      "location": "[variables('location')]",
+      "sku": {
+        "name": "Standard_RAGRS",
+        "tier": "Standard"
+      },
+      "kind": "StorageV2",
+      "properties": {
+        "minimumTlsVersion": "TLS1_2",
+        "accessTier": "Hot",
+        "supportsHttpsTrafficOnly": true,
+        "isHnsEnabled": false
+      }
+    },
+    {
+      "type": "Microsoft.Storage/storageAccounts/blobServices/containers",
+      "name": "[concat(parameters('DataStorageAccountName'), '/default/',parameters('SoftwareInventoryStorageContainer'))]",
+      "apiVersion": "2018-07-01",
+      "properties": {
+        "publicAccess": "None"
+      },
+      "dependsOn": [
+        "[concat('Microsoft.Storage/storageAccounts/', parameters('DataStorageAccountName'))]"
+      ]
+    },
+    {
+      "type": "Microsoft.Storage/storageAccounts/blobServices/containers",
+      "name": "[concat(parameters('DataStorageAccountName'), '/default/',parameters('VulnerabilityAssessmentStorageContainer'))]",
+      "apiVersion": "2018-07-01",
+      "properties": {
+        "publicAccess": "None"
+      },
+      "dependsOn": [
+        "[concat('Microsoft.Storage/storageAccounts/', parameters('DataStorageAccountName'))]"
+      ]
+    },
+    {
+      "type": "Microsoft.Authorization/roleAssignments",
+      "apiVersion": "2021-04-01-preview",
+      "name": "[variables('StorageBlobDataContributorRoleName')]",
+      "scope": "[concat('Microsoft.Storage/storageAccounts', '/', parameters('DataStorageAccountName'))]",
+      "properties": {
+        "roleDefinitionId": "[variables('StorageBlobDataContributorRoleDefinitionId')]",
+        "principalId": "[reference(variables('AnalyticsMIResourceID'), '2018-11-30', 'Full').properties.principalId]"
+      },
+      "dependsOn": [
+        "[concat('Microsoft.Storage/storageAccounts/', parameters('DataStorageAccountName'))]"
+      ]
+    },
+    {
+      "apiVersion": "2019-06-01",
+      "type": "Microsoft.Storage/storageAccounts",
+      "name": "[parameters('VulnerabilitiesDbStorageAccountName')]",
+      "location": "[variables('location')]",
+      "sku": {
+        "name": "Standard_RAGRS",
+        "tier": "Standard"
+      },
+      "kind": "StorageV2",
+      "properties": {
+        "minimumTlsVersion": "TLS1_2",
+        "accessTier": "Hot",
+        "supportsHttpsTrafficOnly": true,
+        "isHnsEnabled": false
+      }
+    },
+    {
+      "type": "Microsoft.Storage/storageAccounts/blobServices/containers",
+      "name": "[concat(parameters('VulnerabilitiesDbStorageAccountName'), '/default/',parameters('TrivyDbContainerName'))]",
+      "apiVersion": "2018-07-01",
+      "properties": {
+        "publicAccess": "None"
+      },
+      "dependsOn": [
+        "[concat('Microsoft.Storage/storageAccounts/', parameters('VulnerabilitiesDbStorageAccountName'))]"
+      ]
+    },
+    {
+      "apiVersion": "2019-06-01",
+      "type": "Microsoft.Storage/storageAccounts",
+      "name": "[parameters('UntrustedFunctionsStorageAccountName')]",
+      "location": "[variables('location')]",
+      "sku": {
+        "name": "Standard_RAGRS",
+        "tier": "Standard"
+      },
+      "kind": "StorageV2",
+      "properties": {
+        "minimumTlsVersion": "TLS1_2",
+        "accessTier": "Hot",
+        "supportsHttpsTrafficOnly": true,
+        "isHnsEnabled": false
+      }
+    },
+    {
+      "type": "Microsoft.Web/serverfarms",
+      "apiVersion": "2015-04-01",
+      "name": "[parameters('UntrustedFunctionAppsHostingPlanName')]",
+      "location": "[resourcegroup().location]",
+      "properties": {
+        "name": "[parameters('UntrustedFunctionAppsHostingPlanName')]"
+      },
+      "sku": {
+        "Tier": "ElasticPremium",
+        "Name": "EP3",
+        "family": "EP"
+      }
+    },
+    { 
+      "type": "microsoft.insights/components",
+      "apiVersion": "2015-05-01",
+      "name": "[parameters('UntrustedFunctionAppsApplicationInsights')]",
+      "location": "[variables('location')]",
+      "properties": {
+      }
+    },
+    {
+      "apiVersion": "2019-06-01",
+      "type": "Microsoft.Storage/storageAccounts",
+      "name": "[parameters('TrustedFunctionsStorageAccountName')]",
+      "location": "[variables('location')]",
+      "sku": {
+        "name": "Standard_RAGRS",
+        "tier": "Standard"
+      },
+      "kind": "StorageV2",
+      "properties": {
+        "minimumTlsVersion": "TLS1_2",
+        "accessTier": "Hot",
+        "supportsHttpsTrafficOnly": true,
+        "isHnsEnabled": false
+      }
+    },
+    {
+      "type": "Microsoft.Web/serverfarms",
+      "apiVersion": "2015-04-01",
+      "name": "[parameters('TrustedFunctionAppsHostingPlanName')]",
+      "location": "[resourcegroup().location]",
+      "properties": {
+        "name": "[parameters('TrustedFunctionAppsHostingPlanName')]"
+      },
+      "sku": {
+        "Tier": "ElasticPremium",
+        "Name": "EP3",
+        "family": "EP"
+      }
+    },
+    { 
+      "type": "microsoft.insights/components",
+      "apiVersion": "2015-05-01",
+      "name": "[parameters('TrustedFunctionAppsApplicationInsights')]",
+      "location": "[variables('location')]",
+      "properties": {
+      }
+    },
+    {
+      "comments": "Defines how the Geneva Monitoring Agent should be configured.",
+      "type": "Microsoft.Web/serverfarms/firstPartyApps/settings",
+      "name": "[concat(parameters('TrustedFunctionAppsApplicationInsights'), '/AntMDS/ConfigJson')]",
+      "apiVersion": "2015-08-01",
+      "location": "[resourceGroup().location]",
+      "properties": {
+        "firstPartyId": "AntMDS",
+        "settingName": "ConfigJson",
+        "settingValue": "[string(variables('GenevaconfigJson'))]"
+      }
+    },
+    {
+      "comments": "Defines what events the Geneva Monitoring Agent should upload. This should be a placeholder configuration for services using GCS.",
+      "type": "Microsoft.Web/serverfarms/firstPartyApps/settings",
+      "name": "[concat(parameters('TrustedFunctionAppsApplicationInsights'), '/AntMDS/MdsConfigXml')]",
+      "apiVersion": "2018-02-01",
+      "location": "[resourceGroup().location]",
+      "properties": {
+        "firstPartyId": "AntMDS",
+        "settingName": "MdsConfigXml",
+        "settingValue": "[variables('GenevaconfigXml')]"
+      }
+    },
+    {
+      "type": "Microsoft.Web/serverfarms/firstPartyApps/keyVaultSettings",
+      "name": "[concat(parameters('TrustedFunctionAppsApplicationInsights'), '/AntMDS/CERTIFICATE_PFX_GENEVACERT')]",
+      "apiVersion": "2018-02-01",
+      "location": "[resourceGroup().location]",
+      "properties": {
+        "firstPartyId": "AntMDS",
+        "settingName": "CERTIFICATE_PFX_GENEVACERT",
+        "vaultId": "[parameters('GenevaCertKeyVaultResourceId')]",
+        "secretName": "[parameters('GenevaCertName')]"
+      }
+    },
+    {
+      "type": "Microsoft.Web/serverfarms/firstPartyApps/settings",
+      "name": "[concat(parameters('TrustedFunctionAppsApplicationInsights'), '/AntMDS/CERTIFICATE_PASSWORD_GENEVACERT')]",
+      "apiVersion": "2018-02-01",
+      "location": "[resourceGroup().location]",
+      "properties": {
+        "firstPartyId": "AntMDS",
+        "settingName": "CERTIFICATE_PASSWORD_GENEVACERT",
+        "settingValue": ""
+      }
+    }
+  ]
+}

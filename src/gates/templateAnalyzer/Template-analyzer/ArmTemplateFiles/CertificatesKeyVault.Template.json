@@ -1,0 +1,176 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2015-01-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "keyVaultName": {
+      "type": "string",
+      "metadata": {
+        "description": "Specifies the key vault name."
+      }
+    },
+    "keyVaultAccessPolicies": {
+      "type": "string",
+      "metadata": {
+        "description": "Specifies the access policies of the key vault."
+      }
+    },
+    "managedIdentityName": {
+      "type": "string",
+      "metadata": {
+        "description": "Name of the managed identity to give KV access to"
+      }
+    },
+    "omsWorkspaceName": {
+      "type": "string",
+      "metadata": {
+        "description": "Name of the Log Analytics workspace to send KV logs to"
+      }
+    },
+    "readPermissions": {
+      "type": "object",
+      "metadata": {
+        "description": "An object containing read Key Vault access policies."
+      }
+    },
+    "fullPermissions": {
+      "type": "object",
+      "metadata": {
+        "description": "An object containing all Key Vault access policies."
+      }
+    },
+    "resourceGroupLocation": {
+      "type": "string",
+      "defaultValue": "[resourceGroup().location]",
+      "metadata": {
+        "description": "Specifies the Azure location where the key vault should be created."
+      }
+    },
+    "tenantId": {
+      "type": "string",
+      "defaultValue": "[subscription().tenantId]",
+      "metadata": {
+        "description": "Specifies the Azure Active Directory tenant ID that should be used for authenticating requests to the key vault. Get it by using Get-AzSubscription cmdlet."
+      }
+    }
+  },
+  "variables": {
+    "accessPoliciesArray": "[json(parameters('keyVaultAccessPolicies'))]"
+  },
+  "resources": [
+    {
+      "type": "Microsoft.ManagedIdentity/userAssignedIdentities",
+      "apiVersion": "2018-11-30",
+      "name": "[parameters('managedIdentityName')]",
+      "location": "[resourceGroup().location]"
+    },
+    {
+      "type": "Microsoft.KeyVault/vaults",
+      "name": "[parameters('keyVaultName')]",
+      "location": "[parameters('resourceGroupLocation')]",
+      "apiVersion": "2018-02-14",
+      "tags": {
+        "displayName": "KeyVault"
+      },
+      "properties": {
+        "tenantId": "[parameters('tenantId')]",
+        "copy": [
+          {
+            "name": "accessPolicies",
+            "count": "[length(variables('accessPoliciesArray'))]",
+            "input": {
+              "tenantId": "[parameters('tenantId')]",
+              "applicationId": "[variables('accessPoliciesArray')[copyIndex('accessPolicies')]['AppId']]",
+              "objectId": "[variables('accessPoliciesArray')[copyIndex('accessPolicies')]['ObjectId']]",
+              "permissions": "[parameters(variables('accessPoliciesArray')[copyIndex('accessPolicies')]['Permissions'])]"
+            }
+          }
+        ],
+        "sku": {
+          "name": "Standard",
+          "family": "A"
+        },
+        "networkAcls": {
+          "defaultAction": "Allow",
+          "bypass": "AzureServices"
+        },
+        "enabledForDeployment": true,
+        "enabledForDiskEncryption": true,
+        "enabledForTemplateDeployment": true,
+        "enableSoftDelete": true
+      },
+      "resources": [
+        {
+          "type": "Microsoft.KeyVault/vaults/providers/diagnosticsettings",
+          "name": "[concat(parameters('keyVaultName'), '/Microsoft.Insights/service')]",
+          "apiVersion": "2016-09-01",
+          "location": "[parameters('resourceGroupLocation')]",
+          "dependsOn": [
+            "[resourceId('Microsoft.KeyVault/vaults', parameters('keyVaultName'))]",
+            "[resourceId('Microsoft.OperationalInsights/workspaces', parameters('omsWorkspaceName'))]"
+          ],
+          "properties": {
+            "workspaceId": "[resourceId('Microsoft.OperationalInsights/workspaces', parameters('omsWorkspaceName'))]",
+            "logs": [
+              {
+                "category": "AuditEvent",
+                "enabled": true,
+                "retentionPolicy": {
+                  "enabled": true,
+                  "days": 180
+                }
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "type": "Microsoft.KeyVault/vaults/accessPolicies",
+      "name": "[concat(parameters('keyVaultName'), '/add')]", 
+      "apiVersion": "2016-10-01",
+      "dependsOn": [
+        "[resourceId('Microsoft.KeyVault/vaults', parameters('keyVaultName'))]",
+        "[resourceId('Microsoft.ManagedIdentity/userAssignedIdentities', parameters('managedIdentityName'))]"
+      ],
+      "properties": {
+        "accessPolicies": [
+          {
+            "tenantId": "[subscription().tenantId]",
+            "objectId": "[reference(resourceId(resourceGroup().name, 'Microsoft.ManagedIdentity/userAssignedIdentities/', parameters('managedIdentityName')), '2018-11-30', 'Full').properties.principalId]",
+            "permissions": {
+              "keys": [
+                "get",
+                "list"
+              ],
+              "secrets": [
+                "get",
+                "list"
+              ],
+              "certificates": [
+                "get",
+                "list"
+              ]
+            }
+          }
+        ]
+      }
+    },
+    {
+      "type": "Microsoft.OperationalInsights/workspaces",
+      "name": "[parameters('omsWorkspaceName')]",
+      "apiVersion": "2017-03-15-preview",
+      "location": "[parameters('resourceGroupLocation')]",
+      "properties": {
+        "sku": {
+          "name": "pergb2018"
+        },
+        "retentionInDays": 180,
+        "features": {
+          "searchVersion": 1,
+          "legacy": 0,
+          "enableLogAccessUsingOnlyResourcePermissions": true
+        }
+      }
+    }
+  ]
+}

@@ -1,0 +1,290 @@
+﻿{
+  "$schema": "http://schema.management.azure.com/schemas/2015-01-01/deploymentTemplate.json",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "FunctionAppName": {
+      "type": "string"
+    },
+    "TrustedFunctionAppsApplicationInsights": {
+      "type": "string"
+    },
+    "TrustedFunctionAppsHostingPlanName": {
+      "type": "string"
+    },
+    "TrustedFunctionStorageAccountName": {
+      "type": "string"
+    },
+    "DeploymentZippedFunction": {
+      "type": "securestring"
+    },
+    "AnalyticsMIResourceID": {
+      "type": "string"
+    },
+    "StorageAccountName": {
+      "type": "string"
+    },
+    "SoftwareInventoryContainerName": {
+      "type": "string",
+      "metadata": {
+        "description": "The name of the container that will hold the software inventory"
+      }
+    },
+    "SoftwareInventoryBlobSasTokenExpirationInMinutes": {
+      "type": "int",
+      "metadata": {
+        "description": "The number of minutes the SAS token will be valid for"
+      }
+    },
+    "VulnerabilityAssessmentContainerName": {
+      "type": "string",
+      "metadata": {
+        "description": "The name of the container that will hold the vulnerability assessment"
+      }
+    },
+    "VulnerabilityAssessmentBlobSasTokenExpirationInMinutes": {
+      "type": "int",
+      "metadata": {
+        "description": "The number of minutes the SAS token will be valid for"
+      }
+    },
+    "ServiceBusNamespaceName": {
+      "type": "string"
+    },
+    "PublishReportQueueName": {
+      "type": "string",
+      "metadata": {
+        "description": "The name of the queue that will hold the reports - the va assessor sends the reports to this queue"
+      }
+    },
+    "RedisCacheName": {
+      "type": "string"
+    },
+    "RedisCacheEndpointSuffix": {
+      "type": "string"
+    },
+    "RedisCacheConnectTimeoutInSeconds": {
+      "type": "int",
+      "metadata": {
+        "description": "The number of seconds to wait for a connection to the Redis cache"
+      }
+    },
+    "RedisCacheDefaultDatabase": {
+      "type": "int",
+      "metadata": {
+        "description": "The default database to use when connecting to the Redis cache"
+      }
+    },
+    "RedisCacheDefaultExpiryInMinutes": {
+      "type": "int",
+      "metadata": {
+        "description": "The default expiry time in minutes for the Redis cache"
+      }
+    },
+    "RedisCacheRetriesCount": {
+      "type": "int",
+      "metadata": {
+        "description": "The number of times to retry connecting to the Redis cache"
+      }
+    },
+    "VaAssessorGolangFunctionAppName": {
+      "type": "string",
+      "metadata": {
+        "description": "The name of the Va Assessor Golang function app"
+      }
+    },
+    "VaAssessorGolangFunctionName": {
+      "type": "string",
+      "metadata": {
+        "description": "The name of the Va Assessor Golang function name - for exmaple vulnerabilityassessor."
+      }
+    },
+    "EnvironmentName": {
+      "type": "string"
+    },
+    "GenevaAccountName": {
+      "type": "string",
+      "metadata": {
+        "description": "Geneva name for the account"
+      }
+    },
+    "GenevaNamespace": {
+      "type": "string",
+      "metadata": {
+        "description": "Geneva namespace"
+      }
+    },
+    "GenevaRoleIdentity": {
+      "type": "string",
+      "metadata": {
+        "description": "Geneva role identity"
+      }
+    },
+    "GenevaTenantIdentity": {
+      "type": "string",
+      "metadata": {
+        "description": "Geneva tenant identity"
+      }
+    },
+    "GenevaMetricNamespace": {
+      "type": "string",
+      "metadata": {
+        "description": "Geneva name for the metric namespace"
+      }
+    },
+    "RegionShortName": {
+      "type": "string",
+      "metadata": {
+        "description": "the short abbreviation of the region short name (Ex: cus)"
+      }
+    }
+  },
+  "variables": {
+    "ServerFarmName": "[parameters('TrustedFunctionAppsHostingPlanName')]",
+    "AnalyticsMIResourceID": "[parameters('AnalyticsMIResourceID')]",
+    "ServiceBusNamespaceEndpoint": "[concat(parameters('ServiceBusNamespaceName'), '.servicebus.windows.net')]",
+    "VaAssessorGolangResourceId": "[resourceId('Microsoft.Web/sites/functions', parameters('VaAssessorGolangFunctionAppName'), parameters('VaAssessorGolangFunctionName'))]",
+    "GenevaRoleIdentityWithRegion": "[concat(parameters('RegionShortName'), '-', parameters('GenevaRoleIdentity'))]"
+  },
+  "resources": [
+    {
+      "type": "Microsoft.Web/sites",
+      "apiVersion": "2020-06-01",
+      "name": "[parameters('FunctionAppName')]",
+      "location": "[resourcegroup().location]",
+      "kind": "functionapp",
+      "identity": {
+        "type": "UserAssigned",
+        "userAssignedIdentities": {
+          "[variables('AnalyticsMIResourceID')]": {}
+        }
+      },
+      "properties": {
+        "enabled": true,
+        "hostNameSslStates": [
+          {
+            "name": "[concat(parameters('TrustedFunctionAppsHostingPlanName'), '.azurewebsites.net')]",
+            "sslState": "Disabled",
+            "hostType": "Standard"
+          },
+          {
+            "name": "[concat(parameters('TrustedFunctionAppsHostingPlanName'), '.scm.azurewebsites.net')]",
+            "sslState": "Disabled",
+            "hostType": "Repository"
+          }
+        ],
+        "serverFarmId": "[resourceId('Microsoft.Web/serverfarms', variables('serverFarmName'))]",
+        "reserved": false,
+        "isXenon": false,
+        "hyperV": false,
+        "name": "[parameters('FunctionAppName')]",
+        "siteConfig": {
+          "use32BitWorkerProcess": false,
+          "siteAuthSettings": {
+            "appSettings": [
+              {
+                "Name": "WEBSITE_FIRST_PARTY_ID",
+                "Value": "AntMDS"
+              },
+              {
+                "Name": "WEBSITE_NODE_DEFAULT_VERSION",
+                "Value": "6.7.0"
+              }
+            ],
+            "enabled": true,
+            "unauthenticatedClientAction": "RedirectToLoginPage",
+            "tokenStoreEnabled": true,
+            "allowedExternalRedirectUrls": null,
+            "defaultProvider": "AzureActiveDirectory",
+            "clientSecretCertificateThumbprint": null,
+            "additionalLoginParams": null,
+            "isAadAutoProvisioned": false,
+            "googleClientId": null,
+            "googleClientSecret": null,
+            "googleOAuthScopes": null,
+            "facebookAppId": null,
+            "facebookAppSecret": null,
+            "facebookOAuthScopes": null,
+            "twitterConsumerKey": null,
+            "twitterConsumerSecret": null,
+            "microsoftAccountClientId": null,
+            "microsoftAccountClientSecret": null,
+            "microsoftAccountOAuthScopes": null
+          },
+          "AlwaysOn": true
+        },
+        "clientAffinityEnabled": true,
+        "clientCertEnabled": false,
+        "httpsOnly": true,
+        "redundancyMode": "None",
+        "hostNamesDisabled": false
+      },
+      "resources": [
+        {
+          "apiVersion": "2016-03-01",
+          "name": "appsettings",
+          "type": "config",
+          "dependsOn": [
+            "[resourceId('Microsoft.Web/sites', parameters('FunctionAppName'))]",
+            "[concat('Microsoft.Web/Sites/', parameters('FunctionAppName'), '/Extensions/ZipDeploy')]"
+          ],
+          "properties": {
+            "AzureWebJobsDashboard": "[concat('DefaultEndpointsProtocol=https;AccountName=',parameters('TrustedFunctionStorageAccountName'),';AccountKey=',listKeys(resourceId('Microsoft.Storage/storageAccounts', parameters('TrustedFunctionStorageAccountName')), '2019-06-01').keys[0].value, ';EndpointSuffix=', environment().suffixes.storage)]",
+            "AzureWebJobsStorage": "[concat('DefaultEndpointsProtocol=https;AccountName=',parameters('TrustedFunctionStorageAccountName'),';AccountKey=',listKeys(resourceId('Microsoft.Storage/storageAccounts', parameters('TrustedFunctionStorageAccountName')), '2019-06-01').keys[0].value, ';EndpointSuffix=', environment().suffixes.storage)]",
+            "APPINSIGHTS_INSTRUMENTATIONKEY": "[reference(concat('microsoft.insights/components/', parameters('TrustedFunctionAppsApplicationInsights')), '2015-05-01').InstrumentationKey]",
+            "APPLICATIONINSIGHTS_CONNECTION_STRING": "[reference(concat('microsoft.insights/components/', parameters('TrustedFunctionAppsApplicationInsights')), '2015-05-01').ConnectionString]",
+            "FUNCTIONS_WORKER_RUNTIME": "dotnet",
+            "ArmEndpoint": "[environment().resourceManager]",
+            "WEBSITE_RUN_FROM_PACKAGE": "1",
+            "FUNCTIONS_EXTENSION_VERSION": "~4",
+            "WEBSITE_FIRST_PARTY_ID": "AntMDS",
+            "WEBSITE_NODE_DEFAULT_VERSION": "6.7.0",
+            "WEBSITE_CONTENTAZUREFILECONNECTIONSTRING": "[concat('DefaultEndpointsProtocol=https;AccountName=',parameters('TrustedFunctionStorageAccountName'),';AccountKey=',listKeys(resourceId('Microsoft.Storage/storageAccounts', parameters('TrustedFunctionStorageAccountName')), '2019-06-01').keys[0].value )]",
+            "WEBSITE_CONTENTSHARE": "[toLower(parameters('FunctionAppName'))]",
+            "AzureWebJobsSecretStorageType": "Files",
+            "GenevaAccountName": "[parameters('GenevaAccountName')]",
+            "GenevaNamespace": "[parameters('GenevaNamespace')]",
+            "GenevaRoleIdentity": "[variables('GenevaRoleIdentityWithRegion')]",
+            "GenevaTenantIdentity": "[parameters('GenevaTenantIdentity')]",
+            "GenevaMetricNamespace": "[parameters('GenevaMetricNamespace')]",
+            "ServiceBusQueueConnection__clientId": "[reference(variables('AnalyticsMIResourceID'), '2018-11-30', 'Full').properties.clientId]",
+            "ServiceBusQueueConnection__credential": "managedidentity",
+            "ServiceBusQueueConnection__fullyQualifiedNamespace": "[variables('ServiceBusNamespaceEndpoint')]",
+            "EnvironmentName": "[parameters('EnvironmentName')]",
+            "IsLocalDevelopment": false,
+            "AnalyticsManagedIdentityClientId": "[reference(variables('AnalyticsMIResourceID'), '2018-11-30', 'Full').properties.clientId]",
+            "PublishReportServiceBusClientConfiguration:NamespaceEndpoint": "[variables('ServiceBusNamespaceEndpoint')]",
+            "PublishReportServiceBusClientConfiguration:QueueName": "[parameters('PublishReportQueueName')]",
+            "RedisCacheClientConfiguration:ClientName": "[parameters('FunctionAppName')]",
+            "RedisCacheClientConfiguration:ConnectionString": "[concat(parameters('RedisCacheName'), '.', parameters('RedisCacheEndpointSuffix'), ':6380,password=', listkeys(resourceId('Microsoft.Cache/Redis', parameters('RedisCacheName')), '2018-03-01').primaryKey, ',ssl=True,abortConnect=False')]",
+            "RedisCacheClientConfiguration:ConnectTimeoutInSeconds": "[parameters('RedisCacheConnectTimeoutInSeconds')]",
+            "RedisCacheClientConfiguration:DefaultDatabase": "[parameters('RedisCacheDefaultDatabase')]",
+            "RedisCacheClientConfiguration:DefaultExpiryInMinutes": "[parameters('RedisCacheDefaultExpiryInMinutes')]",
+            "RetryableRedisCacheClientConfiguration:RetryCount": "[parameters('RedisCacheRetriesCount')]",
+            "SoftwareInventoryAzureStorageBlobClientWrapperConfiguration:AccountName": "[parameters('StorageAccountName')]",
+            "SoftwareInventoryAzureStorageBlobClientWrapperConfiguration:ContainerName": "[parameters('SoftwareInventoryContainerName')]",
+            "SoftwareInventoryAzureStorageBlobClientWrapperConfiguration:DefaultTimespanValidityInMinutes": "[parameters('SoftwareInventoryBlobSasTokenExpirationInMinutes')]",
+            "VulnerabilityAssessmentAzureStorageBlobClientWrapperConfiguration:AccountName": "[parameters('StorageAccountName')]",
+            "VulnerabilityAssessmentAzureStorageBlobClientWrapperConfiguration:ContainerName": "[parameters('VulnerabilityAssessmentContainerName')]",
+            "VulnerabilityAssessmentAzureStorageBlobClientWrapperConfiguration:DefaultTimespanValidityInMinutes": "[parameters('VulnerabilityAssessmentBlobSasTokenExpirationInMinutes')]",
+            "VaAssessorGolangFunctionEndpoint": "[listsecrets(variables('VaAssessorGolangResourceId'),'2015-08-01').trigger_url]",
+            "WorkWithLocalVaAssessorFunctionGolang": false,
+            "TrivyVaAssessorFunctionLocalEndpoint": ""
+          }
+        },
+        {
+          "name": "ZipDeploy",
+          "type": "Extensions",
+          "apiVersion": "2020-12-01",
+          "location": "[resourceGroup().location]",
+          "dependsOn": [
+            "[resourceId('Microsoft.Web/Sites', parameters('FunctionAppName'))]"
+          ],
+          "properties": {
+            "packageUri": "[parameters('DeploymentZippedFunction')]"
+
+          }
+        }
+      ]
+    }
+  ]
+}

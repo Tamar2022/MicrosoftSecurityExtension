@@ -1,0 +1,35 @@
+apiVersion: extensions/v1beta1
+kind: Deployment
+metadata:
+  name: nginx
+  labels:
+    app: nginx
+spec:
+  volumes:
+    # hostPath:
+    #   path: "/var/run/docker.sock"
+  selector:
+    matchLabels:
+      app: nginx
+  template:
+    metadata:
+      labels:
+        app: nginx
+    spec:
+      containers:
+      - name: payment
+        image: nginx
+        # resources: 
+        #   limits: 
+        #     cpu: 200            
+        securityContext:
+          readOnlyRootFilesystem: true
+          capabilities:
+            drop:
+              - all
+            add:
+              - NET_BIND_SERVICE
+
+              # SPEC .VOLUMECLAIMTEMPLATES[] .SPEC .RESOURCES .REQUESTS .STORAGE
+
+# .spec .volumes[] .hostPath .path == "/var/run/docker.sock"

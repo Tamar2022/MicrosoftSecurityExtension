@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+    <dict>
+        <key>scopeName</key>
+        <string>code.log</string>
+        <key>fileTypes</key>
+        <array>
+            <string>log</string>
+        </array>
+        <key>name</key>
+        <string>Log file</string>
+        <key>patterns</key>
+        <array>
+           <dict>
+                <!-- kubesec passed -->
+                <key>match</key>
+                <string>✔\S+"(.*?)"\S+"reason"\S+"(.*?)"\S+</string>
+                <key>name</key>
+                <string>keyword</string>
+            </dict>
+            <dict>
+                <!-- kubesec critical -->
+                <key>match</key>
+                <string>✘\S+"(.*?)"\S+"reason"\S+"(.*?)"\S+</string>
+                <key>name</key>
+                <string>invalid</string>
+            </dict>
+            <dict>
+                <!-- kubesec advise -->
+                <key>match</key>
+                <string>->\S+"(.*?)"\S+"reason"\S+"(.*?)"\S+</string>
+                <key>name</key>
+                <string>support.function</string>
+            </dict>  
+                           
+        </array>
+        <key>uuid</key>
+        <string>ab259404-3072-4cd4-a943-7cbbd32e373f</string>
+    </dict>
+</plist>
+
+

@@ -1,0 +1,133 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "FunctionAppName": {
+      "type": "string"
+    },
+    "VulnerabilityDatabaseUrl": {
+      "type": "string"
+    },
+    "UntrustedFunctionsStorageAccountName": {
+      "type": "string"
+    },
+    "UntrustedFunctionAppsHostingPlanName": {
+      "type": "string"
+    },
+    "DeploymentZippedFunction": {
+      "type": "securestring"
+    },
+    "UntrustedFunctionAppsApplicationInsights": {
+      "type": "string"
+    },
+    "VulnerabilityDatabaseStorageAccountName": {
+      "type": "string"
+    }
+  },
+  "variables": {
+    "ResourceGroupName": "[resourceGroup().name]",
+    "StorageAccountContributorGuid": "ba92f5b4-2d11-453d-a403-e96b0029c9fe", 
+    "StoragAccountContributorRoleName": "[guid(subscription().id ,variables('StorageAccountContributorGuid'),variables('ResourceGroupName'), parameters('UntrustedFunctionsStorageAccountName'))]",
+    "StorageAccountContributorRoleDefinitionId": "[concat('/subscriptions/', subscription().subscriptionId, '/providers/Microsoft.Authorization/roleDefinitions/', variables('StorageAccountContributorGuid'))]"
+  },
+  "resources": [
+    {
+      "type": "Microsoft.Authorization/roleAssignments",
+      "apiVersion": "2021-04-01-preview",
+      "dependsOn": [
+        "[resourceId('Microsoft.Web/Sites', parameters('FunctionAppName'))]"
+        ],
+      "name": "[variables('StoragAccountContributorRoleName')]",
+      "scope": "[concat('Microsoft.Storage/storageAccounts', '/', parameters('VulnerabilityDatabaseStorageAccountName'))]",
+      "properties": {
+        "roleDefinitionId": "[variables('StorageAccountContributorRoleDefinitionId')]",
+        "principalId": "[reference(resourceId('Microsoft.Web/sites',parameters('FunctionAppName')),'2019-08-01','full').identity.principalId]"
+      }
+    },
+    {
+      "type": "Microsoft.Web/sites",
+      "apiVersion": "2021-03-01",
+      "name": "[parameters('FunctionAppName')]",
+      "location": "[resourceGroup().location]",
+      "identity": {
+        "type": "SystemAssigned"
+      },
+      "kind": "functionapp",
+      "properties": {
+        "name": "[parameters('FunctionAppName')]",
+        "siteConfig": {
+          "use32BitWorkerProcess": false,
+          "appSettings": [
+            {
+              "name": "AzureWebJobsStorage",
+              "value": "[concat('DefaultEndpointsProtocol=https;AccountName=',parameters('UntrustedFunctionsStorageAccountName'),';AccountKey=',listKeys(resourceId('Microsoft.Storage/storageAccounts', parameters('UntrustedFunctionsStorageAccountName')), '2015-06-15').key1, ';EndpointSuffix=', environment().suffixes.storage)]"
+            },
+            {
+              "name": "AzureWebJobsSecretStorageType",
+              "value": "Files"
+            },
+            {
+              "name": "FUNCTIONS_EXTENSION_VERSION",
+              "value": "~4"
+            },
+            {
+              "name": "ArmEndpoint",
+              "value": "[environment().resourceManager]"
+            },
+            {
+              "name": "WEBSITE_RUN_FROM_PACKAGE",
+              "value": "1"
+            },
+            {
+              "name": "APPINSIGHTS_INSTRUMENTATIONKEY",
+              "value": "[reference(concat('microsoft.insights/components/', parameters('UntrustedFunctionAppsApplicationInsights')), '2015-05-01').InstrumentationKey]"
+            },
+            {
+              "name": "APPLICATIONINSIGHTS_CONNECTION_STRING",
+              "value": "[reference(concat('microsoft.insights/components/', parameters('UntrustedFunctionAppsApplicationInsights')), '2015-05-01').ConnectionString]"
+            },
+            {
+              "name": "WEBSITE_CONTENTSHARE",
+              "value": "[parameters('FunctionAppName')]"
+            },
+            {
+              "name": "SUBSCRIPTION_ID",
+              "value": "[subscription().subscriptionId]"
+            },
+            {
+              "name": "RESOURCE_GROUP",
+              "value": "[resourceGroup().Name]"
+            },
+            {
+              "name": "WEBSITE_CONTENTAZUREFILECONNECTIONSTRING",
+              "value": "[concat('DefaultEndpointsProtocol=https;AccountName=',parameters('UntrustedFunctionsStorageAccountName'),';AccountKey=',listKeys(resourceId('Microsoft.Storage/storageAccounts', parameters('UntrustedFunctionsStorageAccountName')), '2019-06-01').keys[0].value )]"
+            },
+            {
+              "name": "VulnerabilityDatabaseUrl",
+              "value": "[parameters('VulnerabilityDatabaseUrl')]"
+            }
+          ],
+          "alwaysOn": true
+        },
+        "clientAffinityEnabled": true,
+        "clientCertEnabled": false,
+        "httpsOnly": true,
+        "hostNamesDisabled": false,
+        "serverFarmId": "[concat(resourcegroup().id, '/providers/Microsoft.Web/serverfarms/', parameters('UntrustedFunctionAppsHostingPlanName'))]"
+      },
+      "resources": [
+        {
+          "name": "ZipDeploy",
+          "type": "Extensions",
+          "apiVersion": "2015-08-01",
+          "dependsOn": [
+            "[resourceId('Microsoft.Web/Sites', parameters('FunctionAppName'))]"
+          ],
+          "properties": {
+            "packageUri": "[parameters('DeploymentZippedFunction')]"
+          }
+        }
+      ]
+    }
+  ]
+}
